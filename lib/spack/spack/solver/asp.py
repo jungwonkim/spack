@@ -997,14 +997,13 @@ class SpackSolverSetup(object):
             self.gen.out.write(external_rule)
             self.gen.control.add("base", [], external_rule)
 
-    def concretization_preferences(self, pkg_name):
+    def preferred_variants(self, pkg_name):
         """Facts on concretization preferences, as read from packages.yaml"""
         preferences = spack.package_prefs.PackagePrefs
         preferred_variants = preferences.preferred_variants(pkg_name)
         if not preferred_variants:
             return
 
-        self.gen.h2('Concretization preferences {0}'.format(pkg_name))
         for variant_name in sorted(preferred_variants):
             variant = preferred_variants[variant_name]
             self.gen.fact(
@@ -1012,6 +1011,21 @@ class SpackSolverSetup(object):
                     pkg_name, variant.name, variant.value
                 )
             )
+
+    def preferred_targets(self, pkg_name):
+        key_fn = spack.package_prefs.PackagePrefs(pkg_name, 'target')
+        target_specs = [
+            spack.spec.Spec('target={0}'.format(target_name))
+            for target_name in llnl.util.cpu.targets
+        ]
+        preferred_targets = [x for x in target_specs if key_fn(x) < 0]
+        if not preferred_targets:
+            return
+
+        preferred = preferred_targets[0]
+        self.gen.fact(fn.package_target_weight(
+            str(preferred.architecture.target), pkg_name, -10
+        ))
 
     def flag_defaults(self):
         self.gen.h2("Compiler flag defaults")
@@ -1189,8 +1203,6 @@ class SpackSolverSetup(object):
         for compiler in sorted(compilers):
             supported = self._supported_targets(compiler, compatible_targets)
 
-#            print("   ", compiler, "supports", [t.name for t in supported])
-
             if not supported:
                 continue
 
@@ -1223,10 +1235,10 @@ class SpackSolverSetup(object):
             # prefer best possible targets; weight others poorly so
             # they're not used unless set explicitly
             if target.name in best_targets:
-                self.gen.fact(fn.target_weight(target.name, i))
+                self.gen.fact(fn.default_target_weight(target.name, i))
                 i += 1
             else:
-                self.gen.fact(fn.target_weight(target.name, 100))
+                self.gen.fact(fn.default_target_weight(target.name, 100))
 
             self.gen.newline()
 
@@ -1390,7 +1402,8 @@ class SpackSolverSetup(object):
         for pkg in sorted(pkgs):
             self.gen.h2('Package: %s' % pkg)
             self.pkg_rules(pkg)
-            self.concretization_preferences(pkg)
+            self.preferred_variants(pkg)
+            self.preferred_targets(pkg)
 
         self.gen.h1('Spec Constraints')
         for spec in sorted(specs):
