@@ -1376,7 +1376,9 @@ class SpackSolverSetup(object):
         check_packages_exist(specs)
 
         # get list of all possible dependencies
-        self.possible_virtuals = set()
+        self.possible_virtuals = set(
+            x.name for x in specs if x.virtual
+        )
         possible = spack.package.possible_dependencies(
             *specs,
             virtuals=self.possible_virtuals,
@@ -1420,7 +1422,11 @@ class SpackSolverSetup(object):
 
         self.gen.h1('Spec Constraints')
         for spec in sorted(specs):
-            self.gen.fact(fn.root(spec.name))
+            if not spec.virtual:
+                self.gen.fact(fn.root(spec.name))
+            else:
+                self.gen.fact(fn.virtual_root(spec.name))
+
             for dep in spec.traverse():
                 self.gen.h2('Spec: %s' % str(dep))
 
