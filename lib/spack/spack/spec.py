@@ -2319,7 +2319,7 @@ class Spec(object):
         for s in self.traverse():
             # TODO: Refactor this into a common method to build external specs
             # TODO: or turn external_path into a lazy property
-            self.ensure_external_path_if_external()
+            self.ensure_external_path_if_external(s)
 
         # Mark everything in the spec as concrete, as well.
         self._mark_concrete()
