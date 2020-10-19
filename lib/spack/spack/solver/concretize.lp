@@ -115,6 +115,7 @@ node(Dependency) :- node(Package), depends_on(Package, Dependency).
 #defined external/1.
 #defined external_spec/2.
 #defined external_version_declared/4.
+#defined external_only/1.
 #defined pkg_provider_preference/4.
 #defined default_provider_preference/3.
 #defined root/1.
