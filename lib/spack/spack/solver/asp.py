@@ -1044,11 +1044,15 @@ class SpackSolverSetup(object):
 
         for variant_name in sorted(preferred_variants):
             variant = preferred_variants[variant_name]
-            self.gen.fact(
-                fn.variant_default_value_from_packages_yaml(
-                    pkg_name, variant.name, variant.value
-                )
-            )
+            values = variant.value
+
+            if not isinstance(values, tuple):
+                values = (values,)
+
+            for value in values:
+                self.gen.fact(fn.variant_default_value_from_packages_yaml(
+                    pkg_name, variant.name, value
+                ))
 
     def preferred_targets(self, pkg_name):
         key_fn = spack.package_prefs.PackagePrefs(pkg_name, 'target')
