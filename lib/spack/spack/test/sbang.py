@@ -160,7 +160,7 @@ def test_shebang_handles_non_writable_files(script_dir):
     assert oct(not_writable_mode) == oct(st.st_mode)
 
 
-def check_sbang():
+def check_sbang_installation():
     sbang_path = sbang.sbang_install_path()
     sbang_bin_dir = os.path.dirname(sbang_path)
     assert sbang_path.startswith(spack.store.layout.root)
@@ -183,7 +183,7 @@ def test_install_sbang(install_mockery):
     assert not os.path.exists(sbang_bin_dir)
 
     sbang.install_sbang()
-    check_sbang()
+    check_sbang_installation()
 
     # put an invalid file in for sbang
     fs.mkdirp(sbang_bin_dir)
@@ -191,8 +191,69 @@ def test_install_sbang(install_mockery):
         f.write("foo")
 
     sbang.install_sbang()
-    check_sbang()
+    check_sbang_installation()
 
     # install again and make sure sbang is still fine
     sbang.install_sbang()
-    check_sbang()
+    check_sbang_installation()
+
+
+def test_sbang_fails_without_argument():
+    sbang = which(spack.paths.sbang_script)
+    sbang(fail_on_error=False)
+    assert sbang.returncode == 1
+
+
+def test_sbang_with_different_shebangs(tmpdir):
+    script = str(tmpdir.join("script"))
+
+    def check_sbang(shebang, returncode, expected=None):
+        # write a script out with <shebang> on second line
+        with open(script, "w") as f:
+            f.write("#!{sbang}\n{shebang}\n".format(
+                sbang=spack.paths.sbang_script,
+                shebang=shebang
+            ))
+
+        # test running it through sbang
+        sbang = which(spack.paths.sbang_script)
+
+        # sbang -d prints what *would* be executed
+        out = sbang("-d", script, output=str, fail_on_error=False)
+
+        # check error status and output vs. expected
+        assert sbang.returncode == returncode
+
+        if expected is not None:
+            assert expected == out.strip()
+
+    # perl, with and without /usr/bin/env
+    check_sbang("#!/path/to/perl", 0, "/path/to/perl -x %s" % script)
+    check_sbang("#!/usr/bin/env perl", 0, "/usr/bin/env perl -x %s" % script)
+
+    # perl -w, with and without /usr/bin/env
+    check_sbang("#!/path/to/perl -w", 0, "/path/to/perl -w -x %s" % script)
+    check_sbang(
+        "#!/usr/bin/env perl -w", 0, "/usr/bin/env perl -w -x %s" % script)
+
+    # ruby, with and without /usr/bin/env
+    check_sbang("#!/path/to/ruby", 0, "/path/to/ruby -x %s" % script)
+    check_sbang("#!/usr/bin/env ruby", 0, "/usr/bin/env ruby -x %s" % script)
+
+    # python, with and without /usr/bin/env
+    check_sbang("#!/path/to/python", 0, "/path/to/python %s" % script)
+    check_sbang("#!/usr/bin/env python", 0, "/usr/bin/env python %s" % script)
+
+    # simple shell scripts
+    check_sbang("#!/bin/sh", 0, "/bin/sh %s" % script)
+    check_sbang("#!/bin/bash", 0, "/bin/bash %s" % script)
+
+    # error case: sbang as infinite loop
+    check_sbang("#!/path/to/sbang", 1)
+    check_sbang("#!/usr/bin/env sbang", 1)
+
+    # lua
+    check_sbang("--!/path/to/lua", 0, "/path/to/lua %s" % script)
+
+    # node
+    check_sbang("//!/path/to/node", 0, "/path/to/node %s" % script)
